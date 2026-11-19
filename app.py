@@ -492,96 +492,93 @@ def gerar():
 @app.route("/gerar-planilha", methods=["POST"])
 def gerar_planilha():
     try:
-            payload = request.get_json(force=True)
+        payload = request.get_json(force=True)
         data_ref_str = payload.get("data_ref", "").strip()
         somente_abaixo = bool(payload.get("somente_abaixo", True))
         itens_raw = payload.get("itens", [])
 
         try:
             dt_ref = datetime.strptime(data_ref_str, "%d/%m/%Y").date()
-    except Exception:
-        dt_ref = date.today()
-        data_ref_str = dt_ref.strftime("%d/%m/%Y")
-
-    with open(CATALOGO_PATH, "r", encoding="utf-8") as f:
-        catalogo = json.load(f)
-
-    linhas_calculadas = []
-    linhas_filtradas = []
-
-    for it in itens_raw:
-        cod = str(it.get("codigo", "")).strip()
-        qtd_raw = str(it.get("qtd", "")).strip()
-        fab_iso = str(it.get("fab", "")).strip()
-        val_iso = str(it.get("val", "")).strip()
-        desc_manual = str(it.get("descricao", "")).strip().upper()
-
-        # Ignora linhas incompletas onde só digitaram código/descrição sem preencher dados de recebimento
-        if not (qtd_raw and fab_iso and val_iso):
-            continue
-
-        descricao = desc_manual or catalogo.get(cod, "PRODUTO NÃO CADASTRADO")
-        qtd_fmt = formatar_qtd_br(qtd_raw)
-
-        fab_fmt = ""
-        val_fmt = ""
-        abaixo_val = ""
-        abaixo_num = None
-
-        try:
-            dt_fab = datetime.strptime(fab_iso, "%Y-%m-%d").date()
-            dt_val = datetime.strptime(val_iso, "%Y-%m-%d").date()
-            fab_fmt = dt_fab.strftime("%d/%m/%Y")
-            val_fmt = dt_val.strftime("%d/%m/%Y")
-
-            dif = (dt_val - dt_fab).days
-            base1 = dif - (dt_ref - dt_fab).days
-            base2 = calcular_val_min(dif)
-            if base2 is not None:
-                abaixo_num = base1 - base2
-                abaixo_val = str(abaixo_num)
         except Exception:
-            continue
+            dt_ref = date.today()
+            data_ref_str = dt_ref.strftime("%d/%m/%Y")
 
-        registro = {
-            "codigo": cod,
-            "descricao": descricao,
-            "qtd": qtd_raw,
-            "qtd_fmt": qtd_fmt,
-            "fab_iso": fab_iso,
-            "val_iso": val_iso,
-            "fab_fmt": fab_fmt,
-            "val_fmt": val_fmt,
-            "abaixo": abaixo_val,
-            "abaixo_num": abaixo_num,
-        }
-        linhas_calculadas.append(registro)
+        with open(CATALOGO_PATH, "r", encoding="utf-8") as f:
+            catalogo = json.load(f)
 
-        if somente_abaixo:
-            if abaixo_num is not None and abaixo_num < 0:
+        linhas_calculadas = []
+        linhas_filtradas = []
+
+        for it in itens_raw:
+            cod = str(it.get("codigo", "")).strip()
+            qtd_raw = str(it.get("qtd", "")).strip()
+            fab_iso = str(it.get("fab", "")).strip()
+            val_iso = str(it.get("val", "")).strip()
+            desc_manual = str(it.get("descricao", "")).strip().upper()
+
+            if not (qtd_raw and fab_iso and val_iso):
+                continue
+
+            descricao = desc_manual or catalogo.get(cod, "PRODUTO NÃO CADASTRADO")
+            qtd_fmt = formatar_qtd_br(qtd_raw)
+
+            try:
+                dt_fab = datetime.strptime(fab_iso, "%Y-%m-%d").date()
+                dt_val = datetime.strptime(val_iso, "%Y-%m-%d").date()
+                fab_fmt = dt_fab.strftime("%d/%m/%Y")
+                val_fmt = dt_val.strftime("%d/%m/%Y")
+
+                dif = (dt_val - dt_fab).days
+                base1 = dif - (dt_ref - dt_fab).days
+                base2 = calcular_val_min(dif)
+                if base2 is not None:
+                    abaixo_num = base1 - base2
+                    abaixo_val = str(abaixo_num)
+                else:
+                    abaixo_num = None
+                    abaixo_val = ""
+            except Exception:
+                continue
+
+            registro = {
+                "codigo": cod,
+                "descricao": descricao,
+                "qtd": qtd_raw,
+                "qtd_fmt": qtd_fmt,
+                "fab_iso": fab_iso,
+                "val_iso": val_iso,
+                "fab_fmt": fab_fmt,
+                "val_fmt": val_fmt,
+                "abaixo": abaixo_val,
+                "abaixo_num": abaixo_num,
+            }
+            linhas_calculadas.append(registro)
+
+            if somente_abaixo:
+                if abaixo_num is not None and abaixo_num < 0:
+                    linhas_filtradas.append(registro)
+            else:
                 linhas_filtradas.append(registro)
-        else:
-            linhas_filtradas.append(registro)
 
-    if not linhas_calculadas:
-        return jsonify({
-            "ok": False,
-            "erro": "Preencha Código, QTD, Fabricação e Validade em pelo menos 1 linha completa."
-        }), 400
+        if not linhas_calculadas:
+            return jsonify({
+                "ok": False,
+                "erro": "Preencha Código, QTD, Fabricação e Validade em pelo menos 1 linha completa."
+            }), 400
 
-    if somente_abaixo and not linhas_filtradas:
-        return jsonify({
-            "ok": False,
-            "erro": "Nenhum item preenchido ficou com saldo ABAIXO (< 0). Desmarque a opção 'Exportar apenas ABAIXO' para gerar todos os itens preenchidos."
-        }), 400
+        if somente_abaixo and not linhas_filtradas:
+            return jsonify({
+                "ok": False,
+                "erro": "Nenhum item preenchido ficou com saldo ABAIXO (< 0). Desmarque a opção 'Exportar apenas ABAIXO' para gerar todos os itens preenchidos."
+            }), 400
 
-    png_bytes = renderizar_imagem_tabela_excel(linhas_filtradas, data_ref_str)
-    png_b64 = base64.b64encode(png_bytes).decode("utf-8")
+        png_bytes = renderizar_imagem_tabela_excel(linhas_filtradas, data_ref_str)
+        png_b64 = base64.b64encode(png_bytes).decode("utf-8")
 
-    xlsx_bytes = gerar_xlsx_recebimento(linhas_calculadas, data_ref_str)
-    xlsx_b64 = base64.b64encode(xlsx_bytes).decode("utf-8")
+        xlsx_bytes = gerar_xlsx_recebimento(linhas_calculadas, data_ref_str)
+        xlsx_b64 = base64.b64encode(xlsx_bytes).decode("utf-8")
 
-    data_slug = data_ref_str.replace("/", ".")
+        data_slug = data_ref_str.replace("/", ".")
         return jsonify({
             "ok": True,
             "total_itens": len(linhas_calculadas),
@@ -593,7 +590,6 @@ def gerar_planilha():
         })
     except Exception as e:
         return jsonify({"ok": False, "erro": f"Erro interno: {str(e)}"}), 500
-
 
 @app.route("/baixar/<int:rec_id>/<tipo>")
 def baixar_historico(rec_id, tipo):
