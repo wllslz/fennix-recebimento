@@ -491,13 +491,14 @@ def gerar():
 
 @app.route("/gerar-planilha", methods=["POST"])
 def gerar_planilha():
-    payload = request.get_json(force=True)
-    data_ref_str = payload.get("data_ref", "").strip()
-    somente_abaixo = bool(payload.get("somente_abaixo", True))
-    itens_raw = payload.get("itens", [])
-
     try:
-        dt_ref = datetime.strptime(data_ref_str, "%d/%m/%Y").date()
+            payload = request.get_json(force=True)
+        data_ref_str = payload.get("data_ref", "").strip()
+        somente_abaixo = bool(payload.get("somente_abaixo", True))
+        itens_raw = payload.get("itens", [])
+
+        try:
+            dt_ref = datetime.strptime(data_ref_str, "%d/%m/%Y").date()
     except Exception:
         dt_ref = date.today()
         data_ref_str = dt_ref.strftime("%d/%m/%Y")
@@ -581,15 +582,18 @@ def gerar_planilha():
     xlsx_b64 = base64.b64encode(xlsx_bytes).decode("utf-8")
 
     data_slug = data_ref_str.replace("/", ".")
-    return jsonify({
-        "ok": True,
-        "total_itens": len(linhas_calculadas),
-        "total_exibidos": len(linhas_filtradas),
-        "arquivo_png": f"VALIDADE_RECEBIMENTO_{data_slug}.png",
-        "arquivo_xlsx": f"RECEBIMENTO_{data_slug}.xlsx",
-        "png_base64": png_b64,
-        "xlsx_base64": xlsx_b64,
-    })
+        return jsonify({
+            "ok": True,
+            "total_itens": len(linhas_calculadas),
+            "total_exibidos": len(linhas_filtradas),
+            "arquivo_png": f"VALIDADE_RECEBIMENTO_{data_slug}.png",
+            "arquivo_xlsx": f"RECEBIMENTO_{data_slug}.xlsx",
+            "png_base64": png_b64,
+            "xlsx_base64": xlsx_b64,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "erro": f"Erro interno: {str(e)}"}), 500
+
 
 @app.route("/baixar/<int:rec_id>/<tipo>")
 def baixar_historico(rec_id, tipo):
