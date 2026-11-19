@@ -658,6 +658,10 @@
         const resp = await fetch('/gerar', { method: 'POST', body: formData });
         const data = await resp.json();
 
+        if (!data.ok) {
+          alert(data.erro || 'Não foi possível gerar a imagem.');
+          return;
+        }
         if (data.ok) {
           const painel = document.getElementById('painel-sucesso');
           painel.style.display = 'block';
@@ -856,13 +860,13 @@
         const qtd = tr.querySelector('.inp-qtd').value.trim();
         const fab = tr.querySelector('.inp-fab').value.trim();
         const val = tr.querySelector('.inp-val').value.trim();
-        if (codigo || descricao) {
+        if (qtd && fab && val && (codigo || descricao)) {
           itens.push({ codigo, descricao, qtd, fab, val });
         }
       });
 
       if (itens.length === 0) {
-        alert('Preencha pelo menos 1 produto na tabela antes de gerar.');
+        alert('Preencha pelo menos 1 linha completa (Código, QTD, Fabricação e Validade) antes de gerar.');
         return;
       }
 

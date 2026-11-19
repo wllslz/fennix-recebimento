@@ -17,6 +17,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = os.path.join(BASE_DIR, "template_recebimento_fennix.docx")
 BASE_XLSX_PATH = os.path.join(BASE_DIR, "base_recebimento.xlsx")
 CATALOGO_PATH = os.path.join(BASE_DIR, "static", "catalogo_produtos.json")
+FONT_BOLD_PATH = os.path.join(BASE_DIR, "static", "fonts", "DejaVuSans-Bold.ttf")
+FONT_REG_PATH = os.path.join(BASE_DIR, "static", "fonts", "DejaVuSans.ttf")
 
 IS_VERCEL = bool(os.environ.get("VERCEL"))
 if IS_VERCEL:
@@ -72,41 +74,43 @@ def init_db():
 init_db()
 
 def carregar_fontes():
-    """Carrega fontes TrueType limpas (DejaVuSans / Arial / Calibri) para renderizar a tabela estilo Excel."""
+    """Carrega fontes TrueType com suporte total a UTF-8 (acentos e cedilha) local e na Vercel."""
     candidatos_bold = [
+        FONT_BOLD_PATH,
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
         "C:\\Windows\\Fonts\\calibrib.ttf",
         "C:\\Windows\\Fonts\\arialbd.ttf",
     ]
     candidatos_reg = [
+        FONT_REG_PATH,
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
         "C:\\Windows\\Fonts\\calibri.ttf",
         "C:\\Windows\\Fonts\\arial.ttf",
     ]
-    f_bold = None
-    f_reg = None
+    f_title = f_bold = f_reg = f_small = None
     for p in candidatos_bold:
         if os.path.exists(p):
-            f_bold = ImageFont.truetype(p, 21)
+            f_title = ImageFont.truetype(p, 22)
+            f_bold = ImageFont.truetype(p, 17)
             break
     for p in candidatos_reg:
         if os.path.exists(p):
-            f_reg = ImageFont.truetype(p, 20)
+            f_reg = ImageFont.truetype(p, 17)
+            f_small = ImageFont.truetype(p, 14)
             break
-    if f_bold is None:
-        f_bold = ImageFont.load_default()
+
+    if f_title is None:
+        f_title = ImageFont.load_default(size=22)
+        f_bold = ImageFont.load_default(size=17)
     if f_reg is None:
-        f_reg = ImageFont.load_default()
-    return f_bold, f_reg
+        f_reg = ImageFont.load_default(size=17)
+        f_small = ImageFont.load_default(size=14)
+    return f_title, f_bold, f_reg, f_small
 
 def calcular_val_min(dif_dias):
-    """Replica exatamente =VLOOKUP(F2, DADOS!A:C, 3, 0) da planilha original."""
     for dias, val_min in REGRAS_SHELF:
         if dias == dif_dias:
             return val_min
-    # Fallback aproximado caso a validade total não seja exata
     escolhido = None
     for dias, val_min in REGRAS_SHELF:
         if dif_dias >= dias:
@@ -125,108 +129,155 @@ def formatar_qtd_br(qtd_raw):
     except Exception:
         return s
 
-def renderizar_imagem_tabela_excel(linhas):
-    """Gera uma imagem PNG fiel à captura de tela da tabela filtrada do Excel (pronta para enviar no WhatsApp)."""
-    f_bold, f_reg = carregar_fontes()
+def quebrar_texto(draw, texto, fonte, max_w):
+    palavras = texto.split()
+    if not palavras:
+        return [""]
+    linhas = []
+    atual = palavras[0]
+    for p in palavras[1:]:
+        teste = f"{atual} {p}"
+        if draw.textlength(teste, font=fonte) <= max_w:
+            atual = teste
+        else:
+            linhas.append(atual)
+            atual = p
+    linhas.append(atual)
+    return linhas[:2]
 
-    # Larguras proporcionais exatas às colunas visíveis da captura de tela:
-    # Col A (Código): 145px | Col B (DESCRIÇÃO): 680px | Col C (QTD): 175px | Col D (FABRICAÇÃO): 215px | Col E (VALIDADE): 205px | Col I (ABAIXO): 135px
-    col_widths = [145, 680, 175, 215, 205, 135]
-    headers = ["", "DESCRIÇÃO", "QTD", "FABRICAÇÃO", "VALIDADE", "ABAIXO"]
-    total_w = sum(col_widths)
-    header_h = 46
-    row_h = 42
-    total_h = header_h + max(len(linhas), 1) * row_h
+def renderizar_imagem_tabela_excel(linhas, data_ref_str=""):
+    """Gera uma imagem PNG limpa, legível e otimizada para envio no WhatsApp."""
+    f_title, f_bold, f_reg, f_small = carregar_fontes()
 
-    img = Image.new("RGB", (total_w, total_h), "#D9D9D9")
+    # Larguras equilibradas para visualização nítida no celular (total = 1140px)
+    col_widths = [105, 515, 105, 145, 145, 125]
+    headers = ["CÓD.", "DESCRIÇÃO DO PRODUTO", "QTD", "FABRICAÇÃO", "VALIDADE", "ABAIXO"]
+    pad_x = 24
+    pad_y = 22
+    banner_h = 64
+    header_h = 44
+    footer_h = 34
+
+    table_w = sum(col_widths)
+    total_w = table_w + pad_x * 2
+
+    # Calcula altura dinâmica de cada linha (suporta descrições em 1 ou 2 linhas)
+    tmp_img = Image.new("RGB", (10, 10))
+    tmp_draw = ImageDraw.Draw(tmp_img)
+    linhas_render = []
+    for item in linhas:
+        desc_lines = quebrar_texto(tmp_draw, str(item.get("descricao", "")), f_reg, col_widths[1] - 20)
+        rh = 46 if len(desc_lines) == 1 else 64
+        linhas_render.append((item, desc_lines, rh))
+
+    body_h = sum(rh for _, _, rh in linhas_render)
+    total_h = pad_y * 2 + banner_h + header_h + body_h + footer_h
+
+    img = Image.new("RGB", (total_w, total_h), "#F1F5F9")
     draw = ImageDraw.Draw(img)
 
-    # Cores idênticas à captura de tela enviada:
-    # Coluna A do cabeçalho: laranja vivo (#ED7D31), Colunas B..I do cabeçalho: terracota/marrom-alaranjado (#C65911)
-    # Linhas de dados: cinza claro uniforme (#D9D9D9) com grade fina (#808080) e borda externa verde Excel (#217346)
-    cor_header_a = "#ED7D31"
-    cor_header_resto = "#C65911"
-    cor_linha = "#D9D9D9"
-    cor_grade = "#8C8C8C"
-    cor_texto = "#000000"
+    # Cartão principal com borda suave
+    card_x1, card_y1 = pad_x, pad_y
+    card_x2, card_y2 = total_w - pad_x, total_h - pad_y
+    draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=12, fill="#FFFFFF", outline="#CBD5E1", width=2)
 
-    # Desenhar cabeçalho
-    x = 0
+    # Faixa superior institucional
+    draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y1 + banner_h], radius=12, fill="#162E52")
+    draw.rectangle([card_x1, card_y1 + banner_h - 14, card_x2, card_y1 + banner_h], fill="#162E52")
+
+    titulo_banner = "CONTROLE DE VALIDADE (SHELF-LIFE) — RECEBIMENTO"
+    draw.text((card_x1 + 18, card_y1 + 20), titulo_banner, fill="#FFFFFF", font=f_title)
+
+    if data_ref_str:
+        badge_txt = f"DATA: {data_ref_str}"
+        bw = int(draw.textlength(badge_txt, font=f_bold)) + 24
+        bx1 = card_x2 - bw - 16
+        by1 = card_y1 + 15
+        draw.rounded_rectangle([bx1, by1, card_x2 - 16, by1 + 34], radius=7, fill="#ED7D31")
+        draw.text((bx1 + 12, by1 + 7), badge_txt, fill="#FFFFFF", font=f_bold)
+
+    # Cabeçalho da tabela
+    y_head = card_y1 + banner_h
+    x = card_x1
     for idx, (w, titulo) in enumerate(zip(col_widths, headers)):
-        bg = cor_header_a if idx == 0 else cor_header_resto
-        draw.rectangle([x, 0, x + w, header_h], fill=bg, outline=cor_grade, width=1)
-
-        if titulo:
-            bbox = draw.textbbox((0, 0), titulo, font=f_bold)
-            tw = bbox[2] - bbox[0]
-            th = bbox[3] - bbox[1]
-            # Centraliza descontando o botão de filtro à direita (24px)
-            tx = x + (w - 22 - tw) // 2
-            ty = (header_h - th) // 2 - 2
-            draw.text((tx, ty), titulo, fill=cor_texto, font=f_bold)
-
-        # Desenhar botão quadrado de filtro do Excel no canto inferior direito da célula do cabeçalho
-        btn_size = 20
-        bx1 = x + w - btn_size - 4
-        by1 = header_h - btn_size - 4
-        bx2 = x + w - 4
-        by2 = header_h - 4
-        draw.rectangle([bx1, by1, bx2, by2], fill="#E6E6E6", outline="#7A7A7A", width=1)
-        # Triângulo preto apontando para baixo
-        cx = (bx1 + bx2) // 2
-        cy = (by1 + by2) // 2
-        draw.polygon([(cx - 4, cy - 2), (cx + 4, cy - 2), (cx, cy + 3)], fill="#333333")
-
+        bg = "#D96B27" if idx == 0 else "#C65911"
+        draw.rectangle([x, y_head, x + w, y_head + header_h], fill=bg, outline="#9C440A", width=1)
+        bbox = draw.textbbox((0, 0), titulo, font=f_bold)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        tx = (x + 12) if idx == 1 else (x + (w - tw) // 2)
+        ty = y_head + (header_h - th) // 2 - 2
+        draw.text((tx, ty), titulo, fill="#FFFFFF", font=f_bold)
         x += w
 
-    # Desenhar linhas de dados
-    for r_idx, item in enumerate(linhas):
-        y1 = header_h + r_idx * row_h
-        y2 = y1 + row_h
+    # Linhas de dados
+    y_curr = y_head + header_h
+    for r_idx, (item, desc_lines, rh) in enumerate(linhas_render):
+        bg_row = "#FFFFFF" if r_idx % 2 == 0 else "#F8FAFC"
+        x = card_x1
         vals = [
             str(item.get("codigo", "")),
-            str(item.get("descricao", "")),
+            desc_lines,
             str(item.get("qtd_fmt", "")),
             str(item.get("fab_fmt", "")),
             str(item.get("val_fmt", "")),
             str(item.get("abaixo", "")),
         ]
-        x = 0
+        abaixo_num = item.get("abaixo_num")
+
         for c_idx, (w, val) in enumerate(zip(col_widths, vals)):
-            draw.rectangle([x, y1, x + w, y2], fill=cor_linha, outline=cor_grade, width=1)
-            if val:
-                bbox = draw.textbbox((0, 0), val, font=f_reg)
+            draw.rectangle([x, y_curr, x + w, y_curr + rh], fill=bg_row, outline="#CBD5E1", width=1)
+
+            if c_idx == 1:
+                line_h = 22
+                total_txt_h = len(val) * line_h
+                start_y = y_curr + (rh - total_txt_h) // 2
+                for l_i, line_str in enumerate(val):
+                    draw.text((x + 12, start_y + l_i * line_h), line_str, fill="#0F172A", font=f_reg)
+            elif c_idx == 5 and val:
+                # Destaque visual no saldo ABAIXO
+                is_neg = abaixo_num is not None and abaixo_num < 0
+                pill_bg = "#FEE2E2" if is_neg else "#DCFCE7"
+                pill_fg = "#B91C1C" if is_neg else "#15803D"
+                pill_border = "#FCA5A5" if is_neg else "#86EFAC"
+                pw, ph = 74, 30
+                px1 = x + (w - pw) // 2
+                py1 = y_curr + (rh - ph) // 2
+                draw.rounded_rectangle([px1, py1, px1 + pw, py1 + ph], radius=6, fill=pill_bg, outline=pill_border, width=1)
+                bbox = draw.textbbox((0, 0), val, font=f_bold)
                 tw = bbox[2] - bbox[0]
                 th = bbox[3] - bbox[1]
-                # Se a descrição for muito longa, ajusta com margem mínima
-                if tw > w - 16:
-                    tx = x + 8
-                else:
-                    tx = x + (w - tw) // 2
-                ty = y1 + (row_h - th) // 2 - 2
-                draw.text((tx, ty), val, fill=cor_texto, font=f_reg)
-            x += w
+                draw.text((px1 + (pw - tw) // 2, py1 + (ph - th) // 2 - 2), val, fill=pill_fg, font=f_bold)
+            elif val:
+                fonte_uso = f_bold if c_idx in (0, 2) else f_reg
+                bbox = draw.textbbox((0, 0), val, font=fonte_uso)
+                tw = bbox[2] - bbox[0]
+                th = bbox[3] - bbox[1]
+                tx = x + (w - tw) // 2
+                ty = y_curr + (rh - th) // 2 - 2
+                draw.text((tx, ty), val, fill="#1E293B", font=fonte_uso)
 
-    # Borda externa fina estilo seleção do Excel
-    draw.rectangle([0, 0, total_w - 1, total_h - 1], outline="#217346", width=2)
+            x += w
+        y_curr += rh
+
+    # Rodapé informativo
+    rodape_txt = f"Fennix Brasil Distribuidora • Setor de Frios • Total de itens listados: {len(linhas_render)}"
+    draw.text((card_x1 + 16, y_curr + 9), rodape_txt, fill="#64748B", font=f_small)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
 
 def gerar_xlsx_recebimento(linhas, data_ref_str):
-    """Gera uma cópia da planilha base preenchida na aba Folha4 com todas as fórmulas originais."""
     wb = openpyxl.load_workbook(BASE_XLSX_PATH)
     ws = wb["Folha4"]
 
-    # Atualiza data de referência em J1 (=TODAY() ou data informada)
     try:
         dt_ref = datetime.strptime(data_ref_str, "%d/%m/%Y")
         ws["J1"].value = dt_ref
     except Exception:
         pass
 
-    # Limpa linhas antigas de dados (linhas 2 até 60) e garante que todas fiquem visíveis
     for r in range(2, 65):
         ws.row_dimensions[r].hidden = False
         ws.cell(r, 1).value = None
@@ -234,7 +285,6 @@ def gerar_xlsx_recebimento(linhas, data_ref_str):
         ws.cell(r, 4).value = None
         ws.cell(r, 5).value = None
 
-    # Preenche a partir da linha 2 com os itens informados
     for idx, item in enumerate(linhas):
         r = 2 + idx
         cod_str = str(item.get("codigo", "")).strip()
@@ -256,7 +306,6 @@ def gerar_xlsx_recebimento(linhas, data_ref_str):
     return out_buf.getvalue()
 
 def preparar_imagem_cnh(file_storage, temp_path):
-    """Corrige rotação EXIF da câmera do celular e calcula dimensões ideais (mm) para caber em 1 página."""
     img = Image.open(file_storage.stream)
     img = ImageOps.exif_transpose(img)
     if img.mode in ("RGBA", "P"):
@@ -466,7 +515,8 @@ def gerar_planilha():
         val_iso = str(it.get("val", "")).strip()
         desc_manual = str(it.get("descricao", "")).strip().upper()
 
-        if not cod and not desc_manual:
+        # Ignora linhas incompletas onde só digitaram código/descrição sem preencher dados de recebimento
+        if not (qtd_raw and fab_iso and val_iso):
             continue
 
         descricao = desc_manual or catalogo.get(cod, "PRODUTO NÃO CADASTRADO")
@@ -477,26 +527,20 @@ def gerar_planilha():
         abaixo_val = ""
         abaixo_num = None
 
-        if fab_iso and val_iso:
-            try:
-                dt_fab = datetime.strptime(fab_iso, "%Y-%m-%d").date()
-                dt_val = datetime.strptime(val_iso, "%Y-%m-%d").date()
-                fab_fmt = dt_fab.strftime("%d/%m/%Y")
-                val_fmt = dt_val.strftime("%d/%m/%Y")
+        try:
+            dt_fab = datetime.strptime(fab_iso, "%Y-%m-%d").date()
+            dt_val = datetime.strptime(val_iso, "%Y-%m-%d").date()
+            fab_fmt = dt_fab.strftime("%d/%m/%Y")
+            val_fmt = dt_val.strftime("%d/%m/%Y")
 
-                # Fórmulas idênticas à Folha4:
-                # DIF = VALIDADE - FABRICAÇÃO
-                # BASE 1 = DIF - (HOJE - FABRICAÇÃO) = VALIDADE - HOJE
-                # BASE 2 = VLOOKUP(DIF, DADOS!A:C, 3, 0)
-                # ABAIXO = BASE 1 - BASE 2
-                dif = (dt_val - dt_fab).days
-                base1 = dif - (dt_ref - dt_fab).days
-                base2 = calcular_val_min(dif)
-                if base2 is not None:
-                    abaixo_num = base1 - base2
-                    abaixo_val = str(abaixo_num)
-            except Exception:
-                pass
+            dif = (dt_val - dt_fab).days
+            base1 = dif - (dt_ref - dt_fab).days
+            base2 = calcular_val_min(dif)
+            if base2 is not None:
+                abaixo_num = base1 - base2
+                abaixo_val = str(abaixo_num)
+        except Exception:
+            continue
 
         registro = {
             "codigo": cod,
@@ -518,10 +562,19 @@ def gerar_planilha():
         else:
             linhas_filtradas.append(registro)
 
-    if not linhas_filtradas and linhas_calculadas:
-        linhas_filtradas = linhas_calculadas
+    if not linhas_calculadas:
+        return jsonify({
+            "ok": False,
+            "erro": "Preencha Código, QTD, Fabricação e Validade em pelo menos 1 linha completa."
+        }), 400
 
-    png_bytes = renderizar_imagem_tabela_excel(linhas_filtradas)
+    if somente_abaixo and not linhas_filtradas:
+        return jsonify({
+            "ok": False,
+            "erro": "Nenhum item preenchido ficou com saldo ABAIXO (< 0). Desmarque a opção 'Exportar apenas ABAIXO' para gerar todos os itens preenchidos."
+        }), 400
+
+    png_bytes = renderizar_imagem_tabela_excel(linhas_filtradas, data_ref_str)
     png_b64 = base64.b64encode(png_bytes).decode("utf-8")
 
     xlsx_bytes = gerar_xlsx_recebimento(linhas_calculadas, data_ref_str)
