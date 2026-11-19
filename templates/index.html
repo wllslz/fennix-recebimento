@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Informativo de Recebimento • Fennix Frios</title>
+  <style>
+    :root {
+      --azul: #1b365d;
+      --vermelho: #a61c1c;
+      --verde-wpp: #16a34a;
+      --fundo: #f1f5f9;
+      --card: #ffffff;
+      --borda: #cbd5e1;
+      --texto: #0f172a;
+      --subtexto: #475569;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: var(--fundo); color: var(--texto); padding-bottom: 40px; }
+    header {
+      background: linear-gradient(135deg, var(--azul) 0%, #102442 100%);
+      color: #fff;
+      padding: 18px 20px;
+      border-bottom: 4px solid var(--vermelho);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    header h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.4px; }
+    header p { margin: 4px 0 0; font-size: 0.85rem; opacity: 0.85; }
+    .container { max-width: 920px; margin: 20px auto; padding: 0 14px; }
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 16px;
+      border: 1px solid var(--borda);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      color: var(--azul);
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .field { display: flex; flex-direction: column; }
+    label { font-size: 0.8rem; font-weight: 600; color: var(--subtexto); margin-bottom: 4px; }
+    input {
+      padding: 10px 11px;
+      border: 1px solid var(--borda);
+      border-radius: 7px;
+      font-size: 0.95rem;
+      background: #fff;
+      color: var(--texto);
+    }
+    input:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 2px rgba(27,54,93,0.15); }
+    .time-row { display: flex; gap: 6px; }
+    .time-row input { flex: 1; }
+    .btn-now {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 7px;
+      padding: 0 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--azul);
+      cursor: pointer;
+    }
+    .btn-now:hover { background: #cbd5e1; }
+    .cnh-box {
+      border: 2px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      background: #f8fafc;
+    }
+    #preview-cnh {
+      max-width: 100%;
+      max-height: 220px;
+      margin-top: 10px;
+      border-radius: 6px;
+      display: none;
+      border: 1px solid var(--borda);
+    }
+    .btn-submit {
+      width: 100%;
+      background: var(--vermelho);
+      color: #fff;
+      border: none;
+      padding: 15px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      border-radius: 9px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(166,28,28,0.25);
+      transition: background 0.15s;
+    }
+    .btn-submit:hover { background: #891515; }
+    .btn-submit:disabled { opacity: 0.65; cursor: wait; }
+    .btn-clear {
+      background: transparent;
+      border: 1px solid var(--borda);
+      color: var(--subtexto);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    /* Painel pós-geração para WhatsApp */
+    #painel-sucesso {
+      display: none;
+      border: 2px solid var(--verde-wpp);
+      background: #f0fdf4;
+    }
+    #painel-sucesso h2 { color: #15803d; border-bottom-color: #bbf7d0; }
+    .acoes-wpp {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .btn-acao {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+    }
+    .btn-wpp { background: var(--verde-wpp); color: #fff; }
+    .btn-wpp:hover { background: #15803d; }
+    .btn-pdf { background: var(--vermelho); color: #fff; }
+    .btn-docx { background: var(--azul); color: #fff; }
+    .btn-copy { background: #e2e8f0; color: var(--texto); }
+    pre#resumo-wpp {
+      background: #fff;
+      border: 1px solid #bbf7d0;
+      border-radius: 7px;
+      padding: 12px;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      margin: 10px 0 0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    th { background: #f8fafc; color: var(--azul); }
+    .link-dl { color: var(--azul); font-weight: 600; text-decoration: none; margin-right: 8px; }
+    .link-dl:hover { text-decoration: underline; }
+    @media (max-width: 600px) {
+      .hide-mobile { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>FENNIX BRASIL DISTRIBUIDORA • MANAUS</h1>
+    <p>Automação de Informativo de Recebimento — Setor de Frios</p>
+  </header>
+
+  <div class="container">
+    <!-- Painel de Compartilhamento Rápido no WhatsApp -->
+    <div id="painel-sucesso" class="card">
+      <h2><span>✅ Informativo Gerado com Sucesso!</span></h2>
+      <p style="margin:0; font-size:0.9rem; color:#166534;">
+        O arquivo foi salvo e baixado. Escolha como deseja enviar no grupo do WhatsApp:
+      </p>
+      <div class="acoes-wpp">
+        <a id="link-wpp-texto" href="#" target="_blank" class="btn-acao btn-wpp">
+          📲 Enviar Resumo no WhatsApp
+        </a>
+        <button type="button" id="btn-share-file" class="btn-acao btn-wpp" style="display:none;" onclick="compartilharArquivoNativo()">
+          📎 Anexar Arquivo no WhatsApp
+        </button>
+        <a id="link-dl-pdf" href="#" class="btn-acao btn-pdf" style="display:none;">
+          📕 Baixar PDF (Ideal WhatsApp)
+        </a>
+        <a id="link-dl-docx" href="#" class="btn-acao btn-docx">
+          📘 Baixar Word (.DOCX)
+        </a>
+        <button type="button" class="btn-acao btn-copy" onclick="copiarResumo()">
+          📋 Copiar Texto Formatado
+        </button>
+      </div>
+      <pre id="resumo-wpp"></pre>
+    </div>
+
+    <form id="formRecebimento" action="/gerar" method="POST" enctype="multipart/form-data">
+      <div class="card">
+        <h2>
+          <span>1. Dados Fiscais e Carga</span>
+          <button type="button" class="btn-clear" onclick="limparFormulario()">Limpar Campos</button>
+        </h2>
+        <div class="grid">
+          <div class="field">
+            <label>Data do Recebimento *</label>
+            <input type="text" name="data" id="data" placeholder="DD/MM/AAAA" required />
+          </div>
+          <div class="field">
+            <label>Nº Fiscal (NF-e) *</label>
+            <input type="text" name="nf" placeholder="Ex: 348261/1352859" required />
+          </div>
+          <div class="field">
+            <label>Nº CT-e</label>
+            <input type="text" name="cte" placeholder="Ex: 35888/1844703" />
+          </div>
+          <div class="field">
+            <label>Bônus</label>
+            <input type="text" name="bonus" placeholder="Ex: 24271/24272" />
+          </div>
+          <div class="field">
+            <label>Nº Lacre</label>
+            <input type="text" name="lacre" placeholder="Ex: 01110270/0078820" />
+          </div>
+          <div class="field">
+            <label>Nº Container</label>
+            <input type="text" name="container" value="XXX" />
+          </div>
+          <div class="field">
+            <label>Quantidade de Paletes *</label>
+            <input type="number" name="paletes" placeholder="Ex: 11" required />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span>2. Controle de Horários (Doca)</span></h2>
+        <div class="grid">
+          <div class="field">
+            <label>Hora de Chegada</label>
+            <div class="time-row">
+              <input type="time" name="hora_chegada" id="hora_chegada" />
+              <button type="button" class="btn-now" onclick="agora('hora_chegada')">Agora</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Início da Operação</label>
+            <div class="time-row">
+              <input type="time" name="hora_inicio" id="hora_inicio" />
+              <button type="button" class="btn-now" onclick="agora('hora_inicio')">Agora</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Fim da Operação</label>
+            <div class="time-row">
+              <input type="time" name="hora_fim" id="hora_fim" />
+              <button type="button" class="btn-now" onclick="agora('hora_fim')">Agora</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Saída da Doca</label>
+            <div class="time-row">
+              <input type="time" name="hora_saida" id="hora_saida" />
+              <button type="button" class="btn-now" onclick="agora('hora_saida')">Agora</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span>3. Fornecedor, Transporte e Equipe</span></h2>
+        <div class="grid-2">
+          <div class="field">
+            <label>Fornecedor *</label>
+            <input type="text" name="fornecedor" list="lista-fornecedores" placeholder="Ex: SEARA ALIMENTOS" required />
+            <datalist id="lista-fornecedores">
+              <option value="SEARA ALIMENTOS">
+              <option value="BRF S.A.">
+              <option value="AURORA COOP">
+              <option value="JBS FRIBOI">
+              <option value="SADIA">
+              <option value="PERDIGÃO">
+            </datalist>
+          </div>
+          <div class="field">
+            <label>Transportadora *</label>
+            <input type="text" name="transportadora" list="lista-transp" placeholder="Ex: NORTE SUL" required />
+            <datalist id="lista-transp">
+              <option value="NORTE SUL">
+              <option value="JSL LOGÍSTICA">
+              <option value="TRANSPORTE PRÓPRIO">
+            </datalist>
+          </div>
+          <div class="field">
+            <label>Placa do Veículo (Cavalo/Truck) *</label>
+            <input type="text" name="placa_veiculo" placeholder="Ex: TRZ-1E15" required />
+          </div>
+          <div class="field">
+            <label>Placa da Carreta</label>
+            <input type="text" name="placa_carreta" value="XXX-XXXX" />
+          </div>
+          <div class="field">
+            <label>Motorista da Transportadora *</label>
+            <input type="text" name="motorista" placeholder="Nome completo do motorista" required />
+          </div>
+          <div class="field">
+            <label>Nº Registro CNH *</label>
+            <input type="text" name="cnh" placeholder="Ex: 062502533" required />
+          </div>
+          <div class="field">
+            <label>Conferente *</label>
+            <input type="text" name="conferente" list="lista-conferentes" placeholder="Ex: KEVIN MORAES" required />
+            <datalist id="lista-conferentes">
+              <option value="KEVIN MORAES">
+              <option value="WILLIAN LIRA">
+            </datalist>
+          </div>
+          <div class="field">
+            <label>Qualidade *</label>
+            <input type="text" name="qualidade" list="lista-qualidade" placeholder="Ex: MAYARA RIBEIRO" required />
+            <datalist id="lista-qualidade">
+              <option value="MAYARA RIBEIRO">
+            </datalist>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span>4. Foto da CNH do Motorista</span></h2>
+        <div class="cnh-box">
+          <label for="foto_cnh" style="cursor:pointer; color: var(--azul); font-size: 0.95rem;">
+            📷 Tocar aqui para tirar foto da CNH ou selecionar imagem
+          </label>
+          <input type="file" id="foto_cnh" name="foto_cnh" accept="image/*" capture="environment" style="margin-top:8px;" onchange="mostrarPreview(this)" />
+          <div>
+            <img id="preview-cnh" alt="Pré-visualização da CNH" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span>5. Operadores APB Carga e Descarga (Opcional)</span></h2>
+        <p style="font-size:0.8rem; color:var(--subtexto); margin-top:-6px;">Deixe em branco se os operadores forem preencher e assinar manualmente na folha impressa.</p>
+        <div class="grid-2">
+          <div class="field"><label>Operador 1 - Nome</label><input type="text" name="op1_nome" /></div>
+          <div class="field"><label>Operador 1 - CPF</label><input type="text" name="op1_cpf" placeholder="000.000.000-00" /></div>
+          <div class="field"><label>Operador 2 - Nome</label><input type="text" name="op2_nome" /></div>
+          <div class="field"><label>Operador 2 - CPF</label><input type="text" name="op2_cpf" placeholder="000.000.000-00" /></div>
+          <div class="field"><label>Operador 3 - Nome</label><input type="text" name="op3_nome" /></div>
+          <div class="field"><label>Operador 3 - CPF</label><input type="text" name="op3_cpf" placeholder="000.000.000-00" /></div>
+          <div class="field"><label>Operador 4 - Nome</label><input type="text" name="op4_nome" /></div>
+          <div class="field"><label>Operador 4 - CPF</label><input type="text" name="op4_cpf" placeholder="000.000.000-00" /></div>
+        </div>
+      </div>
+
+      <button type="submit" id="btnSubmit" class="btn-submit">GERAR DOCUMENTO E PREPARAR WHATSAPP</button>
+    </form>
+
+    {% if historico %}
+    <div class="card" style="margin-top: 22px;">
+      <h2><span>Últimos Recebimentos Gerados</span></h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Fornecedor</th>
+            <th class="hide-mobile">NF</th>
+            <th class="hide-mobile">Placa</th>
+            <th>Paletes</th>
+            <th>Arquivos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in historico %}
+          <tr>
+            <td>{{ item['data_recebimento'] }}</td>
+            <td>{{ item['fornecedor'] }}</td>
+            <td class="hide-mobile">{{ item['nf'] }}</td>
+            <td class="hide-mobile">{{ item['placa_veiculo'] }}</td>
+            <td>{{ item['paletes'] }}</td>
+            <td>
+              <a class="link-dl" href="/baixar/{{ item['id'] }}/docx">DOCX</a>
+              {% if item['arquivo_pdf'] %}
+              <a class="link-dl" style="color:var(--vermelho);" href="/baixar/{{ item['id'] }}/pdf">PDF</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <script>
+    let ultimoArquivoUrl = null;
+    let ultimoArquivoNome = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const hoje = new Date();
+      const dd = String(hoje.getDate()).padStart(2, '0');
+      const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+      const yyyy = hoje.getFullYear();
+      document.getElementById('data').value = `${dd}/${mm}/${yyyy}`;
+    });
+
+    function agora(idCampo) {
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      document.getElementById(idCampo).value = `${hh}:${min}`;
+    }
+
+    function mostrarPreview(input) {
+      const img = document.getElementById('preview-cnh');
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          img.src = e.target.result;
+          img.style.display = 'inline-block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function limparFormulario() {
+      if (confirm('Deseja limpar todos os campos preenchidos?')) {
+        document.getElementById('formRecebimento').reset();
+        document.getElementById('preview-cnh').style.display = 'none';
+        document.getElementById('painel-sucesso').style.display = 'none';
+      }
+    }
+
+    document.getElementById('formRecebimento').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmit');
+      btn.disabled = true;
+      btn.textContent = 'Gerando documento...';
+
+      try {
+        const formData = new FormData(e.target);
+        const resp = await fetch('/gerar', { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        if (data.ok) {
+          const painel = document.getElementById('painel-sucesso');
+          painel.style.display = 'block';
+
+          document.getElementById('resumo-wpp').textContent = data.texto_whatsapp;
+          document.getElementById('link-wpp-texto').href =
+            'https://wa.me/?text=' + encodeURIComponent(data.texto_whatsapp);
+
+          function b64ToBlobUrl(b64, mime) {
+            const byteChars = atob(b64);
+            const byteNumbers = new Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) {
+              byteNumbers[i] = byteChars.charCodeAt(i);
+            }
+            const blob = new Blob([new Uint8Array(byteNumbers)], { type: mime });
+            return URL.createObjectURL(blob);
+          }
+
+          const docxBlobUrl = b64ToBlobUrl(
+            data.docx_base64,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          );
+          const linkDocx = document.getElementById('link-dl-docx');
+          linkDocx.href = docxBlobUrl;
+          linkDocx.download = data.arquivo_docx;
+
+          const linkPdf = document.getElementById('link-dl-pdf');
+          if (data.pdf_base64) {
+            const pdfBlobUrl = b64ToBlobUrl(data.pdf_base64, 'application/pdf');
+            linkPdf.href = pdfBlobUrl;
+            linkPdf.download = data.arquivo_pdf;
+            linkPdf.style.display = 'flex';
+            ultimoArquivoUrl = pdfBlobUrl;
+            ultimoArquivoNome = data.arquivo_pdf;
+          } else {
+            linkPdf.style.display = 'none';
+            ultimoArquivoUrl = docxBlobUrl;
+            ultimoArquivoNome = data.arquivo_docx;
+          }
+
+          if (navigator.canShare) {
+            document.getElementById('btn-share-file').style.display = 'flex';
+          }
+
+          const a = document.createElement('a');
+          a.href = ultimoArquivoUrl;
+          a.download = ultimoArquivoNome;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+
+          painel.scrollIntoView({ behavior: 'smooth' });
+        }
+      } catch (err) {
+        alert('Erro ao gerar o documento: ' + err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'GERAR DOCUMENTO E PREPARAR WHATSAPP';
+      }
+    });
+
+    async function compartilharArquivoNativo() {
+      if (!ultimoArquivoUrl) return;
+      try {
+        const resp = await fetch(ultimoArquivoUrl);
+        const blob = await resp.blob();
+        const file = new File([blob], ultimoArquivoNome, { type: blob.type });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: ultimoArquivoNome,
+            text: document.getElementById('resumo-wpp').textContent
+          });
+        } else {
+          alert('Seu navegador não suporta envio direto de anexos. Use o botão de baixar PDF/DOCX e anexe no WhatsApp.');
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    }
+
+    function copiarResumo() {
+      const txt = document.getElementById('resumo-wpp').textContent;
+      navigator.clipboard.writeText(txt).then(() => {
+        alert('Resumo copiado! Agora é só colar no grupo do WhatsApp.');
+      });
+    }
+  </script>
+</body>
+</html>

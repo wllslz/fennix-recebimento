@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.db
+gerados/*.docx
+gerados/*.pdf
+.vercel
