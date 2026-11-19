@@ -185,7 +185,7 @@ def renderizar_imagem_tabela_excel(linhas, data_ref_str=""):
     draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y1 + banner_h], radius=12, fill="#162E52")
     draw.rectangle([card_x1, card_y1 + banner_h - 14, card_x2, card_y1 + banner_h], fill="#162E52")
 
-    titulo_banner = "CONTROLE DE VALIDADE (SHELF-LIFE) — RECEBIMENTO"
+    titulo_banner = "CONTROLE DE VALIDADE — RECEBIMENTO"
     draw.text((card_x1 + 18, card_y1 + 20), titulo_banner, fill="#FFFFFF", font=f_title)
 
     if data_ref_str:
