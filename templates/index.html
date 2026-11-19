@@ -555,7 +555,6 @@
 
         <div style="margin-top: 12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <button type="button" class="btn-add-row" onclick="adicionarLinhaValidade()">+ Adicionar Produto</button>
-          <span id="status-catalogo" style="font-size:0.78rem; color:var(--subtexto);">Carregando base de produtos...</span>
         </div>
       </div>
 
@@ -603,9 +602,7 @@
         const resp = await fetch('/static/catalogo_produtos.json');
         catalogoProdutos = await resp.json();
         const total = Object.keys(catalogoProdutos).length;
-        document.getElementById('status-catalogo').textContent = `✅ Base carregada: ${total} produtos disponíveis`;
       } catch (e) {
-        document.getElementById('status-catalogo').textContent = '⚠️ Base offline (digite código e descrição manualmente)';
       }
     });
 
