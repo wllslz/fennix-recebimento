@@ -283,6 +283,7 @@
       .tab-btn { font-size: 0.82rem; padding: 10px 8px; }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
   <header>
@@ -610,12 +611,14 @@
     function mostrarPreview(input) {
       const img = document.getElementById('preview-cnh');
       if (input.files && input.files[0]) {
+        const arquivo = input.files[0];
         const reader = new FileReader();
         reader.onload = e => {
           img.src = e.target.result;
           img.style.display = 'inline-block';
         };
-        reader.readAsDataURL(input.files[0]);
+        reader.readAsDataURL(arquivo);
+        lerCnhAutomaticamente(arquivo);
       }
     }
 
@@ -1004,6 +1007,122 @@
         }
       } catch (err) {
         console.log(err);
+      }
+    }
+
+
+    // ==================== OCR AUTOMÁTICO CNH (NOME + Nº REGISTRO) ====================
+    let _statusOcrEl = null;
+    function garantirStatusOcrCnh() {
+      if (_statusOcrEl) return _statusOcrEl;
+      const preview = document.getElementById('preview-cnh');
+      const el = document.createElement('div');
+      el.id = 'status-ocr-cnh';
+      el.style.cssText = 'margin-top:8px;font-size:0.85rem;font-weight:600;color:#1e3a5f;';
+      if (preview && preview.parentNode) {
+        preview.parentNode.insertBefore(el, preview.nextSibling);
+      }
+      _statusOcrEl = el;
+      return el;
+    }
+
+    function extrairDadosCnhDoTexto(textoBruto) {
+      const linhas = (textoBruto || '')
+        .split(/\r?\n/)
+        .map(l => l.replace(/[^\p{L}\p{N}\s\/.-]/gu, ' ').replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+
+      const bloqueios = [
+        'REPUBLICA', 'FEDERATIVA', 'BRASIL', 'MINISTERIO', 'TRANSPORTES',
+        'SECRETARIA', 'NACIONAL', 'TRANSITO', 'CARTEIRA', 'HABILITACAO',
+        'DRIVER', 'LICENSE', 'PERMISSAO', 'VALIDADE', 'NASCIMENTO', 'FILIACAO',
+        'CPF', 'IDENTIDADE', 'RG', 'DOC', 'IDENT', 'REGISTRO', 'CNH', 'ASSINATURA',
+        'LOCAL', 'DATA', 'EMISSAO', 'ORGAO', 'CAT', 'ACC', 'OBS', 'OBSERVACOES'
+      ];
+
+      let registroCnh = '';
+      for (const linha of linhas) {
+        const matchRotulo = linha.match(/(?:REGISTRO|N[º°o]?\s*REG|CNH)\D{0,10}(\d{9,11})/i);
+        if (matchRotulo) {
+          registroCnh = matchRotulo[1];
+          break;
+        }
+      }
+      if (!registroCnh) {
+        const todosNumeros = (textoBruto || '').match(/\b\d{9,11}\b/g) || [];
+        const candidato = todosNumeros.find(n => !/^0{9,11}$/.test(n));
+        if (candidato) registroCnh = candidato;
+      }
+
+      let nomeMotorista = '';
+      for (let i = 0; i < linhas.length; i++) {
+        const up = linhas[i].toUpperCase();
+        if (/^(NOME|NOME COMPLETO|CONDUTOR)\b/.test(up)) {
+          const mesmoLinha = linhas[i].replace(/^(NOME COMPLETO|NOME|CONDUTOR)[:\s-]*/i, '').trim();
+          const proxLinha = linhas[i + 1] || '';
+          const candidato = mesmoLinha.split(' ').filter(p => p.length >= 2).length >= 2 ? mesmoLinha : proxLinha;
+          if (candidato && candidato.split(' ').filter(p => /^[\p{L}]{2,}$/u.test(p)).length >= 2) {
+            nomeMotorista = candidato.toUpperCase();
+            break;
+          }
+        }
+      }
+
+      if (!nomeMotorista) {
+        for (const linha of linhas) {
+          const up = linha.toUpperCase();
+          if (bloqueios.some(b => up.includes(b))) continue;
+          const palavras = linha.split(' ').filter(p => /^[\p{L}]{2,}$/u.test(p));
+          if (palavras.length >= 2 && palavras.length <= 6 && !/\d{4,}/.test(linha)) {
+            nomeMotorista = palavras.join(' ').toUpperCase();
+            break;
+          }
+        }
+      }
+
+      return { nomeMotorista, registroCnh };
+    }
+
+    async function lerCnhAutomaticamente(file) {
+      const statusEl = garantirStatusOcrCnh();
+      if (!file || typeof Tesseract === 'undefined') return;
+      try {
+        statusEl.style.color = '#1e3a5f';
+        statusEl.textContent = 'Lendo CNH (Nome e Nº de Registro)...';
+        const otimizada = await comprimirImagemParaUpload(file, 1600, 0.90);
+        const res = await Tesseract.recognize(otimizada, 'por');
+        const texto = (res && res.data && res.data.text) || '';
+        const { nomeMotorista, registroCnh } = extrairDadosCnhDoTexto(texto);
+
+        const inpNome = document.querySelector('input[name="motorista"]');
+        const inpCnh = document.querySelector('input[name="cnh"]');
+        let preenchidos = [];
+
+        if (nomeMotorista && inpNome) {
+          inpNome.value = nomeMotorista;
+          inpNome.dispatchEvent(new Event('input', { bubbles: true }));
+          inpNome.dispatchEvent(new Event('change', { bubbles: true }));
+          preenchidos.push('Nome: ' + nomeMotorista);
+        }
+        if (registroCnh && inpCnh) {
+          inpCnh.value = registroCnh;
+          inpCnh.dispatchEvent(new Event('input', { bubbles: true }));
+          inpCnh.dispatchEvent(new Event('change', { bubbles: true }));
+          preenchidos.push('Registro: ' + registroCnh);
+        }
+
+        if (typeof salvarRascunhoAba1 === 'function') salvarRascunhoAba1();
+
+        if (preenchidos.length > 0) {
+          statusEl.style.color = '#15803d';
+          statusEl.textContent = 'Preenchido da CNH → ' + preenchidos.join(' | ') + ' (confira se precisar)';
+        } else {
+          statusEl.style.color = '#b45309';
+          statusEl.textContent = 'Não foi possível ler com nitidez; preencha Nome e Registro manualmente.';
+        }
+      } catch (err) {
+        statusEl.style.color = '#b45309';
+        statusEl.textContent = 'Leitura automática indisponível no momento; preencha manualmente.';
       }
     }
 
