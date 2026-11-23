@@ -1,5 +1,7 @@
 # Histórico de Commits — Fennix Recebimento
 
+- **809528c** (2026-11-23) — fix(ocr-cnh): melhora precisao de nome via recorte superior e filtra datas no registro da cnh
+- **1af6571** (2026-11-23) — docs: atualiza CHANGELOG com leitura automatica de nome e registro da CNH
 - **f21d954** (2026-11-23) — feat(ocr-cnh): preenche automaticamente nome do motorista e numero de registro da cnh ao anexar foto
 - **69e3ab9** (2026-11-23) — Merge branch 'main' of https://github.com/wllslz/fennix-recebimento
 - **8166f49** (2026-11-23) — docs: documenta arquitetura, auto-save anti-queda e historico de commits no README e CHANGELOG
