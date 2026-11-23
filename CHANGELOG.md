@@ -1,20 +1,21 @@
 # Histórico de Commits — Fennix Recebimento
 
-- **809528c** (2026-11-23) — fix(ocr-cnh): melhora precisao de nome via recorte superior e filtra datas no registro da cnh
-- **1af6571** (2026-11-23) — docs: atualiza CHANGELOG com leitura automatica de nome e registro da CNH
-- **f21d954** (2026-11-23) — feat(ocr-cnh): preenche automaticamente nome do motorista e numero de registro da cnh ao anexar foto
-- **69e3ab9** (2026-11-23) — Merge branch 'main' of https://github.com/wllslz/fennix-recebimento
-- **8166f49** (2026-11-23) — docs: documenta arquitetura, auto-save anti-queda e historico de commits no README e CHANGELOG
-- **a2c9d2b** (2026-11-23) — docs: documenta arquitetura, auto-save anti-queda e historico de commits no README e CHANGELOG
-- **88e3768** (2026-11-23) — feat(frontend): libera galeria no mobile, comprime CNH contra erro 413 e adiciona auto-save em localStorage
-- **a154cbb** (2026-11-23) — fix(backend): adiciona handlers JSON globais para erros HTTP 413 e 500 na Vercel
-- **7a4216e** (2026-11-19) — Remove sobra do botao da aba e paragrafo explicativo da validade
-- **51a9d98** (2026-11-19) — Restaura layout e remove apenas texto explicativo da aba Validade
-- **a827485** (2026-11-19) — Remove texto explicativo da tabela e deixa aba somente como Validade
-- **befc3d0** (2026-11-19) — Remove indicador de catalogo do rodape da tabela de validade
-- **4ea58c7** (2026-11-19) — Remove termo Shelf-Life dos titulos e textos
-- **726fd7c** (2026-11-19) — Corrige indentacao na rota gerar-planilha
-- **0d47d71** (2026-11-19) — Adiciona fontes TrueType em static/fonts e trata erro JSON em /gerar-planilha
-- **cd30e47** (2026-11-19) — Melhora layout PNG para WhatsApp, corrige acentos na Vercel e filtra apenas linhas completas
-- **54cfea0** (2026-11-19) — Adiciona aba de validade shelf-life com print PNG para WhatsApp
-- **1aac70e** (2026-11-19) — Deploy inicial automacao recebimento Fennix
+- **ba2bb38** (2026-11-23) â€” docs: atualiza CHANGELOG com melhoria de precisao do OCR da CNH
+- **809528c** (2026-11-23) â€” fix(ocr-cnh): melhora precisao de nome via recorte superior e filtra datas no registro da cnh
+- **1af6571** (2026-11-23) â€” docs: atualiza CHANGELOG com leitura automatica de nome e registro da CNH
+- **f21d954** (2026-11-23) â€” feat(ocr-cnh): preenche automaticamente nome do motorista e numero de registro da cnh ao anexar foto
+- **69e3ab9** (2026-11-23) â€” Merge branch 'main' of https://github.com/wllslz/fennix-recebimento
+- **8166f49** (2026-11-23) â€” docs: documenta arquitetura, auto-save anti-queda e historico de commits no README e CHANGELOG
+- **a2c9d2b** (2026-11-23) â€” docs: documenta arquitetura, auto-save anti-queda e historico de commits no README e CHANGELOG
+- **88e3768** (2026-11-23) â€” feat(frontend): libera galeria no mobile, comprime CNH contra erro 413 e adiciona auto-save em localStorage
+- **a154cbb** (2026-11-23) â€” fix(backend): adiciona handlers JSON globais para erros HTTP 413 e 500 na Vercel
+- **7a4216e** (2026-11-19) â€” Remove sobra do botao da aba e paragrafo explicativo da validade
+- **51a9d98** (2026-11-19) â€” Restaura layout e remove apenas texto explicativo da aba Validade
+- **a827485** (2026-11-19) â€” Remove texto explicativo da tabela e deixa aba somente como Validade
+- **befc3d0** (2026-11-19) â€” Remove indicador de catalogo do rodape da tabela de validade
+- **4ea58c7** (2026-11-19) â€” Remove termo Shelf-Life dos titulos e textos
+- **726fd7c** (2026-11-19) â€” Corrige indentacao na rota gerar-planilha
+- **0d47d71** (2026-11-19) â€” Adiciona fontes TrueType em static/fonts e trata erro JSON em /gerar-planilha
+- **cd30e47** (2026-11-19) â€” Melhora layout PNG para WhatsApp, corrige acentos na Vercel e filtra apenas linhas completas
+- **54cfea0** (2026-11-19) â€” Adiciona aba de validade shelf-life com print PNG para WhatsApp
+- **1aac70e** (2026-11-19) â€” Deploy inicial automacao recebimento Fennix
