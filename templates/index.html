@@ -1011,7 +1011,7 @@
     }
 
 
-    // ==================== OCR AUTOMÁTICO CNH (NOME + Nº REGISTRO) ====================
+    // ==================== OCR AUTOMÁTICO CNH (ALTA PRECISÃO) ====================
     let _statusOcrEl = null;
     function garantirStatusOcrCnh() {
       if (_statusOcrEl) return _statusOcrEl;
@@ -1026,61 +1026,121 @@
       return el;
     }
 
-    function extrairDadosCnhDoTexto(textoBruto) {
-      const linhas = (textoBruto || '')
-        .split(/\r?\n/)
-        .map(l => l.replace(/[^\p{L}\p{N}\s\/.-]/gu, ' ').replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
+    function carregarImagemDeArquivo(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = ev.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
 
+    function renderizarRecorteAltoContraste(img, sx, sy, sw, sh, rotacaoDeg = 0, escala = 1.6) {
+      const canvas = document.createElement('canvas');
+      const wBase = Math.max(1, Math.round(sw * escala));
+      const hBase = Math.max(1, Math.round(sh * escala));
+      if (rotacaoDeg === 90 || rotacaoDeg === 270) {
+        canvas.width = hBase;
+        canvas.height = wBase;
+      } else {
+        canvas.width = wBase;
+        canvas.height = hBase;
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((rotacaoDeg * Math.PI) / 180);
+      ctx.filter = 'grayscale(100%) contrast(155%) brightness(105%)';
+      ctx.drawImage(img, sx, sy, sw, sh, -wBase / 2, -hBase / 2, wBase, hBase);
+      ctx.restore();
+      return canvas.toDataURL('image/jpeg', 0.92);
+    }
+
+    function pareceDataOuDocumento(seq) {
+      if (!seq) return true;
+      // Ex: DDMMYYYY ou MMDDYYYY ou YYYYMMDD
+      if (/^(0[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])(19|20)\d{2}$/.test(seq)) return true;
+      if (/^(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])(19|20)\d{2}$/.test(seq)) return true;
+      if (/^(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])$/.test(seq)) return true;
+      return false;
+    }
+
+    function extrairRegistroCnh(textos) {
+      const combinado = textos.join('\n');
+
+      // 1. Procura explicitamente perto de palavras de registro/CNH
+      for (const t of textos) {
+        const linhas = t.split(/\r?\n/);
+        for (const l of linhas) {
+          if (/REGISTRO|N[º°o]?\s*REG|CNH|MATRICULA/i.test(l)) {
+            const candidatas = l.match(/\d{9,11}/g) || [];
+            for (const c of candidatas) {
+              if (!pareceDataOuDocumento(c) && !/^0+$/.test(c)) return c;
+            }
+          }
+        }
+      }
+
+      // 2. Procura sequências de 9 a 11 dígitos que não sejam datas
+      const matches = combinado.match(/\b\d{9,11}\b/g) || [];
+      for (const m of matches) {
+        if (!pareceDataOuDocumento(m) && !/^0+$/.test(m)) return m;
+      }
+
+      // 3. Fallback: sequências com espaços/pontos (ex: 5088 160588)
+      const compactos = (combinado.match(/(?:\d[\s.-]?){9,11}/g) || [])
+        .map(s => s.replace(/\D/g, ''))
+        .filter(d => d.length >= 9 && d.length <= 11 && !pareceDataOuDocumento(d) && !/^0+$/.test(d));
+      return compactos[0] || '';
+    }
+
+    function extrairNomeMotorista(textos) {
       const bloqueios = [
         'REPUBLICA', 'FEDERATIVA', 'BRASIL', 'MINISTERIO', 'TRANSPORTES',
         'SECRETARIA', 'NACIONAL', 'TRANSITO', 'CARTEIRA', 'HABILITACAO',
-        'DRIVER', 'LICENSE', 'PERMISSAO', 'VALIDADE', 'NASCIMENTO', 'FILIACAO',
-        'CPF', 'IDENTIDADE', 'RG', 'DOC', 'IDENT', 'REGISTRO', 'CNH', 'ASSINATURA',
-        'LOCAL', 'DATA', 'EMISSAO', 'ORGAO', 'CAT', 'ACC', 'OBS', 'OBSERVACOES'
+        'DRIVER', 'LICENSE', 'PERMISSAO', 'CONDUCAO', 'VALIDADE', 'NASCIMENTO',
+        'FILIACAO', 'CPF', 'IDENTIDADE', 'RG', 'DOC', 'IDENT', 'REGISTRO',
+        'CNH', 'ASSINATURA', 'LOCAL', 'DATA', 'EMISSAO', 'ORGAO', 'CAT',
+        'ACC', 'OBS', 'OBSERVACOES', 'BRASILEIRO', 'BRASILEIRA', 'SOBRENOME',
+        'PORTADOR', 'VALIDA', 'TERRITORIO'
       ];
 
-      let registroCnh = '';
-      for (const linha of linhas) {
-        const matchRotulo = linha.match(/(?:REGISTRO|N[º°o]?\s*REG|CNH)\D{0,10}(\d{9,11})/i);
-        if (matchRotulo) {
-          registroCnh = matchRotulo[1];
-          break;
-        }
-      }
-      if (!registroCnh) {
-        const todosNumeros = (textoBruto || '').match(/\b\d{9,11}\b/g) || [];
-        const candidato = todosNumeros.find(n => !/^0{9,11}$/.test(n));
-        if (candidato) registroCnh = candidato;
-      }
+      let melhorNome = '';
+      let melhorScore = -999;
 
-      let nomeMotorista = '';
-      for (let i = 0; i < linhas.length; i++) {
-        const up = linhas[i].toUpperCase();
-        if (/^(NOME|NOME COMPLETO|CONDUTOR)\b/.test(up)) {
-          const mesmoLinha = linhas[i].replace(/^(NOME COMPLETO|NOME|CONDUTOR)[:\s-]*/i, '').trim();
-          const proxLinha = linhas[i + 1] || '';
-          const candidato = mesmoLinha.split(' ').filter(p => p.length >= 2).length >= 2 ? mesmoLinha : proxLinha;
-          if (candidato && candidato.split(' ').filter(p => /^[\p{L}]{2,}$/u.test(p)).length >= 2) {
-            nomeMotorista = candidato.toUpperCase();
-            break;
+      for (const textoBruto of textos) {
+        const linhas = (textoBruto || '')
+          .split(/\r?\n/)
+          .map(l => l.replace(/[^\p{L}\s]/gu, ' ').replace(/\s+/g, ' ').trim().toUpperCase())
+          .filter(Boolean);
+
+        for (let i = 0; i < linhas.length; i++) {
+          const linha = linhas[i];
+          const palavras = linha.split(' ').filter(p => p.length >= 2);
+          if (palavras.length < 2 || palavras.length > 6) continue;
+          if (bloqueios.some(b => linha.includes(b))) continue;
+          // Evita linhas muito curtas/fragmentadas como "LE RADONAIDABE" sem sentido ou com palavras de 1-2 letras isoladas
+          const palavrasLongas = palavras.filter(p => p.length >= 3);
+          if (palavrasLongas.length < 2) continue;
+
+          let score = palavrasLongas.length * 10 + Math.min(linha.length, 45);
+          const anterior = i > 0 ? linhas[i - 1] : '';
+          if (anterior.includes('NOME') || anterior.includes('CONDUTOR')) {
+            score += 80;
+          }
+          if (score > melhorScore) {
+            melhorScore = score;
+            melhorNome = palavras.join(' ');
           }
         }
       }
 
-      if (!nomeMotorista) {
-        for (const linha of linhas) {
-          const up = linha.toUpperCase();
-          if (bloqueios.some(b => up.includes(b))) continue;
-          const palavras = linha.split(' ').filter(p => /^[\p{L}]{2,}$/u.test(p));
-          if (palavras.length >= 2 && palavras.length <= 6 && !/\d{4,}/.test(linha)) {
-            nomeMotorista = palavras.join(' ').toUpperCase();
-            break;
-          }
-        }
-      }
-
-      return { nomeMotorista, registroCnh };
+      return melhorNome;
     }
 
     async function lerCnhAutomaticamente(file) {
@@ -1088,15 +1148,55 @@
       if (!file || typeof Tesseract === 'undefined') return;
       try {
         statusEl.style.color = '#1e3a5f';
-        statusEl.textContent = 'Lendo CNH (Nome e Nº de Registro)...';
-        const otimizada = await comprimirImagemParaUpload(file, 1600, 0.90);
-        const res = await Tesseract.recognize(otimizada, 'por');
-        const texto = (res && res.data && res.data.text) || '';
-        const { nomeMotorista, registroCnh } = extrairDadosCnhDoTexto(texto);
+        statusEl.textContent = 'Lendo CNH com alta precisão (Nome e Nº de Registro)...';
+
+        const img = await carregarImagemDeArquivo(file);
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+
+        // Recorte 1: faixa superior/central (onde fica o NOME E SOBRENOME)
+        const recorteNome = renderizarRecorteAltoContraste(
+          img,
+          Math.round(w * 0.08),
+          Math.round(h * 0.14),
+          Math.round(w * 0.84),
+          Math.round(h * 0.28),
+          0,
+          1.6
+        );
+
+        // Recorte 2: imagem completa com contraste
+        const recorteGeral = renderizarRecorteAltoContraste(img, 0, 0, w, h, 0, 1.2);
+
+        // Recorte 3: lateral esquerda (onde costuma ficar o número vertical da CNH)
+        const recorteLateral = renderizarRecorteAltoContraste(
+          img,
+          0,
+          Math.round(h * 0.15),
+          Math.round(w * 0.28),
+          Math.round(h * 0.75),
+          90,
+          1.8
+        );
+
+        const [rNome, rGeral, rLateral] = await Promise.all([
+          Tesseract.recognize(recorteNome, 'por'),
+          Tesseract.recognize(recorteGeral, 'por'),
+          Tesseract.recognize(recorteLateral, 'por'),
+        ]);
+
+        const textos = [
+          (rNome && rNome.data && rNome.data.text) || '',
+          (rGeral && rGeral.data && rGeral.data.text) || '',
+          (rLateral && rLateral.data && rLateral.data.text) || '',
+        ];
+
+        const nomeMotorista = extrairNomeMotorista([textos[0], textos[1]]);
+        const registroCnh = extrairRegistroCnh([textos[2], textos[1], textos[0]]);
 
         const inpNome = document.querySelector('input[name="motorista"]');
         const inpCnh = document.querySelector('input[name="cnh"]');
-        let preenchidos = [];
+        const preenchidos = [];
 
         if (nomeMotorista && inpNome) {
           inpNome.value = nomeMotorista;
