@@ -603,5 +603,14 @@ def baixar_historico(rec_id, tipo):
         return "Arquivo não encontrado no disco", 404
     return send_file(caminho, as_attachment=True, download_name=row[0])
 
+
+@app.errorhandler(413)
+def erro_payload_grande(e):
+    return jsonify({"ok": False, "erro": "Arquivo muito grande (limite de 4,5 MB na Vercel)."}), 413
+
+@app.errorhandler(500)
+def erro_interno_servidor(e):
+    return jsonify({"ok": False, "erro": f"Erro interno ao processar documento: {e}"}), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
