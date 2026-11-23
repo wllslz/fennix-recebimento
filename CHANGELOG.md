@@ -1,6 +1,9 @@
 # Histórico de Commits — Fennix Recebimento
 
+- **f21d954** (2026-11-23) — feat(ocr-cnh): preenche automaticamente nome do motorista e numero de registro da cnh ao anexar foto
+- **69e3ab9** (2026-11-23) — Merge branch 'main' of https://github.com/wllslz/fennix-recebimento
 - **8166f49** (2026-11-23) — docs: documenta arquitetura, auto-save anti-queda e historico de commits no README e CHANGELOG
+- **a2c9d2b** (2026-11-23) — docs: documenta arquitetura, auto-save anti-queda e historico de commits no README e CHANGELOG
 - **88e3768** (2026-11-23) — feat(frontend): libera galeria no mobile, comprime CNH contra erro 413 e adiciona auto-save em localStorage
 - **a154cbb** (2026-11-23) — fix(backend): adiciona handlers JSON globais para erros HTTP 413 e 500 na Vercel
 - **7a4216e** (2026-11-19) — Remove sobra do botao da aba e paragrafo explicativo da validade
