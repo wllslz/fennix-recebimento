@@ -462,7 +462,7 @@
             <label for="foto_cnh" style="cursor:pointer; color: var(--azul); font-size: 0.95rem;">
               📷 Tocar aqui para tirar foto da CNH ou selecionar imagem
             </label>
-            <input type="file" id="foto_cnh" name="foto_cnh" accept="image/*" capture="environment" style="margin-top:8px;" onchange="mostrarPreview(this)" />
+            <input type="file" id="foto_cnh" name="foto_cnh" accept="image/*,.jpg,.jpeg,.png,.webp" style="margin-top:8px;" onchange="mostrarPreview(this)" />
             <div>
               <img id="preview-cnh" alt="Pré-visualização da CNH" />
             </div>
@@ -620,7 +620,8 @@
     }
 
     function limparFormulario() {
-      if (confirm('Deseja limpar todos os campos preenchidos?')) {
+      if (confirm('Deseja limpar todos os campos preenchidos e apagar o rascunho salvo?')) {
+        localStorage.removeItem(STORAGE_KEY_ABA1);
         document.getElementById('formRecebimento').reset();
         document.getElementById('preview-cnh').style.display = 'none';
         document.getElementById('painel-sucesso').style.display = 'none';
@@ -637,6 +638,70 @@
       return URL.createObjectURL(blob);
     }
 
+    async function comprimirImagemParaUpload(file, maxLado = 1400, qualidade = 0.80) {
+      if (!file || !file.type.startsWith('image/')) return file;
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            let w = img.width;
+            let h = img.height;
+            if (w > maxLado || h > maxLado) {
+              if (w >= h) {
+                h = Math.round((h * maxLado) / w);
+                w = maxLado;
+              } else {
+                w = Math.round((w * maxLado) / h);
+                h = maxLado;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) return resolve(file);
+                const novoNome = (file.name || 'cnh.jpg').replace(/\.[^.]+$/, '') + '.jpg';
+                resolve(new File([blob], novoNome, { type: 'image/jpeg' }));
+              },
+              'image/jpeg',
+              qualidade
+            );
+          };
+          img.onerror = () => resolve(file);
+          img.src = ev.target.result;
+        };
+        reader.onerror = () => resolve(file);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function lerJsonSeguro(resp) {
+      const texto = await resp.text();
+      if (!resp.ok) {
+        if (resp.status === 413) {
+          throw new Error('A imagem enviada excedeu o limite do servidor (4,5 MB). Tente novamente.');
+        }
+        try {
+          const errJson = JSON.parse(texto);
+          throw new Error(errJson.erro || `Erro HTTP ${resp.status}`);
+        } catch (e) {
+          if (e.message && !e.message.includes('JSON')) throw e;
+          throw new Error(`Erro no servidor (HTTP ${resp.status}): ${texto.slice(0, 140)}`);
+        }
+      }
+      try {
+        return JSON.parse(texto);
+      } catch (e) {
+        throw new Error('Resposta inválida do servidor: ' + texto.slice(0, 120));
+      }
+    }
+
     // ==================== LÓGICA ABA 1 (INFORMATIVO) ====================
     document.getElementById('formRecebimento').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -646,8 +711,15 @@
 
       try {
         const formData = new FormData(e.target);
+        const inpCnh = document.getElementById('foto_cnh');
+        if (inpCnh && inpCnh.files && inpCnh.files[0]) {
+          btn.textContent = 'Otimizando foto da CNH...';
+          const cnhOtimizada = await comprimirImagemParaUpload(inpCnh.files[0]);
+          formData.set('foto_cnh', cnhOtimizada, cnhOtimizada.name);
+          btn.textContent = 'Gerando documento...';
+        }
         const resp = await fetch('/gerar', { method: 'POST', body: formData });
-        const data = await resp.json();
+        const data = await lerJsonSeguro(resp);
 
         if (!data.ok) {
           alert(data.erro || 'Não foi possível gerar a imagem.');
@@ -934,6 +1006,110 @@
         console.log(err);
       }
     }
+
+    // ==================== AUTO-SAVE ANTI-QUEDA DE ENERGIA (LOCALSTORAGE) ====================
+    const STORAGE_KEY_ABA1 = 'fennix_recebimento_rascunho_aba1_v1';
+    const STORAGE_KEY_ABA2 = 'fennix_recebimento_rascunho_aba2_v1';
+
+    function salvarRascunhoAba1() {
+      const form = document.getElementById('formRecebimento');
+      if (!form) return;
+      const dados = {};
+      form.querySelectorAll('input, select, textarea').forEach(el => {
+        if (el.type === 'file' || !el.name && !el.id) return;
+        const chave = el.id || el.name;
+        if (el.type === 'checkbox' || el.type === 'radio') {
+          dados[chave] = el.checked;
+        } else {
+          dados[chave] = el.value;
+        }
+      });
+      localStorage.setItem(STORAGE_KEY_ABA1, JSON.stringify(dados));
+    }
+
+    function restaurarRascunhoAba1() {
+      try {
+        const salvo = localStorage.getItem(STORAGE_KEY_ABA1);
+        if (!salvo) return;
+        const dados = JSON.parse(salvo);
+        const form = document.getElementById('formRecebimento');
+        if (!form) return;
+        Object.entries(dados).forEach(([chave, valor]) => {
+          const el = document.getElementById(chave) || form.querySelector(`[name="${chave}"]`);
+          if (!el || el.type === 'file') return;
+          if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = Boolean(valor);
+          } else if (valor !== undefined && valor !== null && valor !== '') {
+            el.value = valor;
+          }
+        });
+      } catch (e) {
+        console.warn('Falha ao restaurar rascunho Aba 1:', e);
+      }
+    }
+
+    function salvarRascunhoAba2() {
+      const tbody = document.getElementById('tbody-validade');
+      if (!tbody) return;
+      const linhas = [];
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const obj = {};
+        tr.querySelectorAll('input, select').forEach(inp => {
+          const k = inp.className || inp.name || inp.dataset.campo;
+          if (k) obj[k] = inp.value;
+        });
+        if (Object.keys(obj).length) linhas.push(obj);
+      });
+      const dataRefEl = document.getElementById('data_referencia') || document.querySelector('input[type="date"]');
+      localStorage.setItem(STORAGE_KEY_ABA2, JSON.stringify({
+        data_referencia: dataRefEl ? dataRefEl.value : '',
+        linhas
+      }));
+    }
+
+    function restaurarRascunhoAba2() {
+      try {
+        const salvo = localStorage.getItem(STORAGE_KEY_ABA2);
+        if (!salvo) return;
+        const parsed = JSON.parse(salvo);
+        if (parsed.linhas && parsed.linhas.length && typeof adicionarLinhaValidade === 'function') {
+          const tbody = document.getElementById('tbody-validade');
+          if (tbody) tbody.innerHTML = '';
+          parsed.linhas.forEach(item => {
+            adicionarLinhaValidade();
+            const ultimaTr = tbody.lastElementChild;
+            if (!ultimaTr) return;
+            Object.entries(item).forEach(([cls, val]) => {
+              const inp = ultimaTr.querySelector('.' + cls.split(' ').join('.')) || ultimaTr.querySelector(`[name="${cls}"]`);
+              if (inp && val !== undefined) {
+                inp.value = val;
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            });
+          });
+        }
+      } catch (e) {
+        console.warn('Falha ao restaurar rascunho Aba 2:', e);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      restaurarRascunhoAba1();
+      setTimeout(restaurarRascunhoAba2, 250);
+
+      const form = document.getElementById('formRecebimento');
+      if (form) {
+        form.addEventListener('input', salvarRascunhoAba1);
+        form.addEventListener('change', salvarRascunhoAba1);
+      }
+      const tbody = document.getElementById('tbody-validade');
+      if (tbody) {
+        tbody.addEventListener('input', salvarRascunhoAba2);
+        tbody.addEventListener('change', salvarRascunhoAba2);
+      }
+    });
+
   </script>
 </body>
 </html>
